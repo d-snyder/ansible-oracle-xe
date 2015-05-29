@@ -1,0 +1,66 @@
+---
+#
+# Setup
+#
+
+- name: create temporary dir
+  shell: mktemp -d
+  register: tempdir
+
+- name: ensure packages required are installed
+  yum: 
+    name="{{item}}"
+    state=latest
+  with_items:
+    - libaio
+    - bc
+    - flex
+    - unzip
+
+#
+# Oracle XE
+#
+
+- name: unzip oracle rpm
+  unarchive: 
+    src="oracle-xe-11.2.0-1.0.x86_64.rpm.zip"
+    dest="{{ tempdir.stdout }}"
+
+# RPM creates oracle user and dba group if it doesn't already exist
+- name: install oracle
+  yum: 
+    name="{{ tempdir.stdout }}/Disk1/oracle-xe-11.2.0-1.0.x86_64.rpm"
+    state=present
+
+- name: generate response file
+  template: 
+    src="xe.rsp.j2"
+    dest="{{ tempdir.stdout }}/xe.rsp"
+
+- name: make sure oracle is running
+  service: 
+    name=oracle-xe 
+    state=started
+
+- name: configure oracle
+  shell: "/etc/init.d/oracle-xe configure responseFile={{ tempdir.stdout }}/xe.rsp"
+  ignore_errors: True
+
+- name: setup oracle environment
+  lineinfile: 
+    line="source /u01/app/oracle/product/11.2.0/xe/bin/oracle_env.sh" 
+    dest="/home/vagrant/.bashrc"
+
+- name: set oracle listener
+  shell: echo 'EXEC DBMS_XDB.SETLISTENERLOCALACCESS(FALSE);' | ORACLE_HOME=/u01/app/oracle/product/11.2.0/xe /u01/app/oracle/product/11.2.0/xe/bin/sqlplus
+    system/manager@localhost
+
+#
+# Cleanup
+#
+
+- name: clean up temporary directory
+  file: 
+    state=absent 
+    path="{{ tempdir.stdout }}"
+
