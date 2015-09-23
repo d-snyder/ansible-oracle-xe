@@ -1,5 +1,5 @@
 oracle_http_port: 8080
 oracle_listener_port: 1521
 oracle_password: manager
-oracle_confirm_password: manager
+oracle_confirm_password: "{{ oracle_password }}"
 oracle_dbenable: y

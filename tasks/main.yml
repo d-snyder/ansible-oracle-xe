@@ -3,9 +3,20 @@
 # Setup
 #
 
-- name: create temporary dir
-  shell: mktemp -d
-  register: tempdir
+- set_fact:
+    oracle_xe_version: 11.2.0
+    install_archive: "oracle-xe-11.2.0-1.0.x86_64.rpm.zip" 
+
+- name: temporary directory for install
+  register: mktemp
+  command: mktemp -d
+
+- name: download installation archive
+  get_url:
+  args:
+    url: "{{ oracle_xe_archive_url }}"
+    dest: "{{ playbook_dir }}/{{ oracle_xe_archive }}"
+  when: install_archive_url is defined
 
 - name: ensure packages required are installed
   yum: 
@@ -24,18 +35,23 @@
 - name: unzip oracle rpm
   unarchive: 
     src="oracle-xe-11.2.0-1.0.x86_64.rpm.zip"
-    dest="{{ tempdir.stdout }}"
+    dest="{{ mktemp.stdout }}"
+    creates="{{ mktemp.stdout }}/oracle-xe-11.2.0-1.0.x86_64.rpm"
 
-# RPM creates oracle user and dba group if it doesn't already exist
+- name: create swap so oracle installer doesn't complain
+  shell: "dd if=/dev/zero of=/{{ mktemp.stdout }}/swapfile bs=2048 count=2097152; mkswap /{{ mktemp.stdout }}/swapfile; swapon /{{ mktemp.stdout }}/swapfile; swapon -a"
+  when: ansible_swaptotal_mb <= 2048
+
+# Install via. RPM. Creates oracle user and dba group if it doesn't already exist
 - name: install oracle
   yum: 
-    name="{{ tempdir.stdout }}/Disk1/oracle-xe-11.2.0-1.0.x86_64.rpm"
+    name="{{ mktemp.stdout }}/Disk1/oracle-xe-11.2.0-1.0.x86_64.rpm"
     state=present
 
 - name: generate response file
   template: 
     src="xe.rsp.j2"
-    dest="{{ tempdir.stdout }}/xe.rsp"
+    dest="{{ mktemp.stdout }}/xe.rsp"
 
 - name: make sure oracle is running
   service: 
@@ -43,24 +59,26 @@
     state=started
 
 - name: configure oracle
-  shell: "/etc/init.d/oracle-xe configure responseFile={{ tempdir.stdout }}/xe.rsp"
+  shell: "/etc/init.d/oracle-xe configure responseFile={{ mktemp.stdout }}/xe.rsp"
   ignore_errors: True
 
-- name: setup oracle environment
-  lineinfile: 
-    line="source /u01/app/oracle/product/11.2.0/xe/bin/oracle_env.sh" 
-    dest="/home/vagrant/.bashrc"
+#- name: setup oracle environment
+#  lineinfile: 
+#    line="source /u01/app/oracle/product/{{ oracle_xe_version }}/xe/bin/oracle_env.sh" 
+#    dest="/home/vagrant/.bashrc"
 
 - name: set oracle listener
-  shell: echo 'EXEC DBMS_XDB.SETLISTENERLOCALACCESS(FALSE);' | ORACLE_HOME=/u01/app/oracle/product/11.2.0/xe /u01/app/oracle/product/11.2.0/xe/bin/sqlplus
-    system/manager@localhost
+  shell: "echo 'EXEC DBMS_XDB.SETLISTENERLOCALACCESS(FALSE);' | ORACLE_HOME=/u01/app/oracle/product/{{ oracle_xe_version }}/xe /u01/app/oracle/product/{{ oracle_xe_version }}/xe/bin/sqlplus system/{{ oracle_password }}@localhost"
 
 #
 # Cleanup
 #
 
+- name: remove temporary swap
+  shell: "swapoff /{{ mktemp.stdout }}/swapfile"
+  ignore_errors: True
+
 - name: clean up temporary directory
   file: 
     state=absent 
-    path="{{ tempdir.stdout }}"
-
+    path="{{ mktemp.stdout }}"
