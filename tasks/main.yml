@@ -6,6 +6,7 @@
 - set_fact:
     oracle_xe_version: 11.2.0
     install_archive: "oracle-xe-11.2.0-1.0.x86_64.rpm.zip" 
+#   oracle_xe_archive_url: define url if you want the play to download the RPM for you
 
 - name: temporary directory for install
   register: mktemp
@@ -15,7 +16,7 @@
   get_url:
   args:
     url: "{{ oracle_xe_archive_url }}"
-    dest: "{{ playbook_dir }}/{{ oracle_xe_archive }}"
+    dest: "{{ playbook_dir }}/{{ install_archive }}"
   when: install_archive_url is defined
 
 - name: ensure packages required are installed
