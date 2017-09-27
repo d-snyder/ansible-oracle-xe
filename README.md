@@ -10,14 +10,16 @@ You must accept the license agreement, download oracle-xe-11.2.0-1.0.x86_64.rpm.
 
 http://www.oracle.com/technetwork/database/database-technologies/express-edition/downloads/index.html
 
+Alternatively, you can define the var oracle_xe_archive_url in tasks/main.yml to download the RPM as part of the play
+
 Role Variables
 --------------
 
-oracle_http_port: 8080
-oracle_listener_port: 1521
-oracle_password: manager
-oracle_dbenable: y
-install_url: if this url is defined, the role will attempt to download the above zip file from it.
+- oracle_http_port: 8080
+- oracle_listener_port: 1521
+- oracle_password: manager
+- oracle_dbenable: y
+- oracle_xe_archive_url: if this url is defined, the role will attempt to download the above zip file from it.
 
 Dependencies
 ------------
